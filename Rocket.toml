@@ -1,2 +1,11 @@
 [default]
 address = "0.0.0.0"
+
+[default.databases]
+postgres = { url = "postgres://postgres:postgres@localhost:5430/postgres" }
+
+[development.databases]
+postgres = { url = "postgres://postgres:postgres@database_dev:5432/postgres" }
+
+[test.databases]
+postgres = { url = "postgres://postgres:postgres@database_test:5432/postgres" }
