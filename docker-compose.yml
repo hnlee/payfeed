@@ -1,0 +1,24 @@
+version: "3.9"
+services:
+  database_dev:
+    image: debezium/postgres:14
+    ports:
+      - "5430:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+  database_test:
+    image: debezium/postgres:14
+    ports:
+      - "5431:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - database_dev
