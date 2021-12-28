@@ -20,5 +20,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@database_dev:5432/postgres
     depends_on:
       - database_dev

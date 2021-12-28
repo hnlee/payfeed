@@ -5,5 +5,10 @@ WORKDIR /app
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY src* ./src
+COPY migrations* ./migrations
+COPY diesel.toml . 
 
-CMD ["cargo", "run"]
+RUN cargo install diesel_cli --no-default-features --features postgres 
+RUN cargo build
+
+CMD diesel migration run && cargo run
