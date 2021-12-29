@@ -21,9 +21,10 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8080:8080"
     environment:
-      ROCKET_PROFILE: development
       DATABASE_URL: postgres://postgres:postgres@database_dev:5432/postgres
+      HOST: 0.0.0.0
+      PORT: 8080
     depends_on:
       - database_dev

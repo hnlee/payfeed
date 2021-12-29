@@ -5,11 +5,9 @@ WORKDIR /app
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY migrations* ./migrations
-COPY diesel.toml . 
-RUN cargo install diesel_cli --no-default-features --features postgres 
+RUN cargo install sqlx-cli --no-default-features --features postgres
 
 COPY src* ./src
-COPY Rocket.toml .
 RUN cargo build
 
-CMD diesel migration run && cargo run
+CMD sqlx migrate run && cargo run
