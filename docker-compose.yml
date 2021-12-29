@@ -1,5 +1,31 @@
 version: "3.9"
 services:
+  zookeeper:
+    image: debezium/zookeeper:1.8
+    ports:
+      - "2181:2181"
+      - "2888:2888"
+      - "3888:3888"
+  kafka:
+    image: debezium/kafka:1.8
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    environment:
+      ZOOKEEPER_CONNECT: zookeeper:2181
+  connect:
+    image: debezium/connect:1.8
+    ports:
+      - "8083:8083"
+    environment:
+      BOOTSTRAP_SERVERS: kafka:9092
+      GROUP_ID: 1
+      CONFIG_STORAGE_TOPIC: my_connect_configs
+      OFFSET_STORAGE_TOPIC: my_connect_offsets
+      STATUS_STORAGE_TOPIC: my_connect_statuses
+    depends_on:
+      - kafka
   database_dev:
     image: debezium/postgres:14
     ports:
@@ -28,3 +54,4 @@ services:
       PORT: 8080
     depends_on:
       - database_dev
+      - connect
