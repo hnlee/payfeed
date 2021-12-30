@@ -119,6 +119,7 @@ impl Transfer {
     }
 }
 
+use futures::StreamExt;
 use log::{info, warn};
 use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use rdkafka::consumer::stream_consumer::StreamConsumer;
@@ -126,7 +127,49 @@ use rdkafka::consumer::{CommitMode, Consumer};
 use rdkafka::message::{Headers, Message};
 use rdkafka::util::get_rdkafka_version;
 
-async fn consume_and_print(brokers: &str, group_id: &str, topics: &[&str]) {
+pub async fn consume_and_print(consumer: &StreamConsumer) {
+    info!("I have called the consume_and_print function");
+    let mut message_stream = consumer.start();
+
+    info!("I have started the consumer");
+    while let Some(message) = message_stream.next().await {
+        match message {
+            Err(e) => warn!("Kafka error: {}", e),
+            Ok(m) => {
+                let payload = match m.payload_view::<str>() {
+                    None => "",
+                    Some(Ok(s)) => s,
+                    Some(Err(e)) => {
+                        warn!("Error while deserializing message payload: {:?}", e);
+                        ""
+                    }
+                };
+                info!("key: '{:?}', payload: '{}', topic: {}, partition: {}, offset: {}, timestamp: {:?}",
+                    m.key(), payload, m.topic(), m.partition(), m.offset(), m.timestamp());
+                if let Some(headers) = m.headers() {
+                    for i in 0..headers.count() {
+                        let header = headers.get(i).unwrap();
+                        info!("  Header {:#?}: {:?}", header.0, header.1);
+                    }
+                }
+                consumer.commit_message(&m, CommitMode::Async).unwrap();
+            }
+        };
+    }
+}
+
+pub async fn setup_consumer() -> Result<StreamConsumer> {
+    let (version_n, version_s) = get_rdkafka_version();
+    info!("rd_kafka_version: 0x{:08x}, {}", version_n, version_s);
+
+    let topics = vec![
+        "app.public.users",
+        "app.public.transfers",
+        "app.public.payments",
+    ];
+    let brokers = "kafka:9092";
+    let group_id = "app_consumer_group";
+
     let consumer: StreamConsumer = ClientConfig::new()
         .set("group.id", group_id)
         .set("bootstrap.servers", brokers)
@@ -141,47 +184,7 @@ async fn consume_and_print(brokers: &str, group_id: &str, topics: &[&str]) {
         .subscribe(&topics.to_vec())
         .expect("Can't subscribe to specified topics");
 
-    loop {
-        match consumer.recv().await {
-            Err(e) => warn!("Kafka error: {}", e),
-            Ok(m) => {
-                let payload = match m.payload_view::<str>() {
-                    None => "",
-                    Some(Ok(s)) => s,
-                    Some(Err(e)) => {
-                        warn!("Error while deserializing message payload: {:?}", e);
-                        ""
-                    }
-                };
-                info!("key: '{:?}', payload: '{}', topic: {}, partition: {}, offset: {}, timestamp: {:?}",
-                      m.key(), payload, m.topic(), m.partition(), m.offset(), m.timestamp());
-                if let Some(headers) = m.headers() {
-                    for i in 0..headers.count() {
-                        let header = headers.get(i).unwrap();
-                        info!("  Header {:#?}: {:?}", header.0, header.1);
-                    }
-                }
-                consumer.commit_message(&m, CommitMode::Async).unwrap();
-            }
-        };
-    }
-}
-
-pub async fn run_consumer() {
-    setup_logger(true, "rdkafka:trace");
-
-    let (version_n, version_s) = get_rdkafka_version();
-    info!("rd_kafka_version: 0x{:08x}, {}", version_n, version_s);
-
-    let topics = vec![
-        "app.public.users",
-        "app.public.transfers",
-        "app.public.payments",
-    ];
-    let brokers = "kafka:9092";
-    let group_id = "app_consumer_group";
-
-    consume_and_print(brokers, group_id, &topics).await
+    Ok(consumer)
 }
 
 use chrono::prelude::*;
@@ -191,7 +194,7 @@ use log::{LevelFilter, Record};
 use std::io::Write;
 use std::thread;
 
-pub fn setup_logger(log_thread: bool, rust_log: &str) {
+pub fn setup_logger(log_thread: bool, log_level: &str) {
     let output_format = move |formatter: &mut Formatter, record: &Record| {
         let thread_name = if log_thread {
             format!("(t: {}) ", thread::current().name().unwrap_or("unknown"))
@@ -216,7 +219,7 @@ pub fn setup_logger(log_thread: bool, rust_log: &str) {
     builder
         .format(output_format)
         .filter(None, LevelFilter::Info)
-        .parse_filters(rust_log);
+        .parse_filters(log_level);
 
     builder.init();
 }

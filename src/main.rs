@@ -1,13 +1,15 @@
 use actix_web::{get, middleware, post, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::Result;
-use log::error;
+use log::{error, info};
 use payfeed::{NewPayment, NewTransfer, NewUser, Payment, Transfer, User};
+use rdkafka::consumer::stream_consumer::StreamConsumer;
 use sqlx::postgres::PgPool;
 use std::env;
 
 #[get("/")]
-async fn hello() -> impl Responder {
-    payfeed::run_consumer().await;
+async fn hello(consumer: web::Data<StreamConsumer>) -> impl Responder {
+    info!("I have received the GET request");
+    payfeed::consume_and_print(consumer.get_ref()).await;
     HttpResponse::Ok().body("Hello world!")
 }
 
@@ -66,7 +68,7 @@ fn configure() -> (String, String, u16) {
 
 #[actix_web::main]
 async fn main() -> Result<()> {
-    env_logger::init();
+    payfeed::setup_logger(true, "trace");
     let (database_url, host, port) = configure();
 
     let pool = PgPool::connect(&database_url[..]).await?;
@@ -74,6 +76,7 @@ async fn main() -> Result<()> {
     HttpServer::new(move || {
         App::new()
             .data(pool.clone())
+            .data_factory(payfeed::setup_consumer)
             .wrap(middleware::Logger::default())
             .service(hello)
             .service(create_user)
