@@ -1,4 +1,5 @@
 use anyhow::Result;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use sqlx::postgres::PgPool;
 use sqlx::FromRow;
@@ -42,7 +43,7 @@ impl User {
 pub struct NewPayment {
     pub from_user: Uuid,
     pub to_user: Uuid,
-    pub amount: f64,
+    pub amount: Decimal,
 }
 
 #[derive(Serialize, FromRow, Debug)]
@@ -50,7 +51,7 @@ pub struct Payment {
     pub id: Uuid,
     pub from_user: Uuid,
     pub to_user: Uuid,
-    pub amount: f64,
+    pub amount: Decimal,
 }
 
 impl Payment {
@@ -83,14 +84,14 @@ impl Payment {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct NewTransfer {
     pub for_user: Uuid,
-    pub amount: f64,
+    pub amount: Decimal,
 }
 
 #[derive(Serialize, FromRow, Debug)]
 pub struct Transfer {
     pub id: Uuid,
     pub for_user: Uuid,
-    pub amount: f64,
+    pub amount: Decimal,
 }
 
 impl Transfer {
