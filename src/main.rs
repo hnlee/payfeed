@@ -76,6 +76,8 @@ async fn main() -> Result<()> {
             .wrap(middleware::Logger::default())
             .service(hello)
             .service(create_user)
+            .service(create_payment)
+            .service(create_transfer)
     })
     .bind((&host[..], port))?
     .run()
