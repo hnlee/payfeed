@@ -1,7 +1,7 @@
 use actix_web::{get, middleware, post, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::Result;
 use log::error;
-use payfeed::{NewUser, User};
+use payfeed::{NewPayment, NewTransfer, NewUser, Payment, Transfer, User};
 use sqlx::postgres::PgPool;
 use std::env;
 
@@ -18,6 +18,36 @@ async fn create_user(new_user: web::Json<NewUser>, pool: web::Data<PgPool>) -> i
         Err(err) => {
             error!("Failed to create user: {}", err);
             HttpResponse::BadRequest().json("Failed to create user")
+        }
+    }
+}
+
+#[post("/payments")]
+async fn create_payment(
+    new_payment: web::Json<NewPayment>,
+    pool: web::Data<PgPool>,
+) -> impl Responder {
+    let result = Payment::create(new_payment.into_inner(), pool.get_ref()).await;
+    match result {
+        Ok(payment) => HttpResponse::Created().json(payment),
+        Err(err) => {
+            error!("Failed to create payment: {}", err);
+            HttpResponse::BadRequest().json("Failed to create payment")
+        }
+    }
+}
+
+#[post("/transfers")]
+async fn create_transfer(
+    new_transfer: web::Json<NewTransfer>,
+    pool: web::Data<PgPool>,
+) -> impl Responder {
+    let result = Transfer::create(new_transfer.into_inner(), pool.get_ref()).await;
+    match result {
+        Ok(transfer) => HttpResponse::Created().json(transfer),
+        Err(err) => {
+            error!("Failed to create transfer: {}", err);
+            HttpResponse::BadRequest().json("Failed to create transfer")
         }
     }
 }
@@ -46,6 +76,8 @@ async fn main() -> Result<()> {
             .wrap(middleware::Logger::default())
             .service(hello)
             .service(create_user)
+            .service(create_payment)
+            .service(create_transfer)
     })
     .bind((&host[..], port))?
     .run()

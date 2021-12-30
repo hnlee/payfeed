@@ -7,7 +7,7 @@ COPY Cargo.lock .
 COPY set-up-connector.sh .
 
 COPY migrations* ./migrations
-RUN cargo install sqlx-cli --no-default-features --features postgres
+RUN cargo install sqlx-cli --version 0.5.9 --no-default-features --features postgres
 
 COPY src* ./src
 RUN cargo build

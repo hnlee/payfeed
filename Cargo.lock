@@ -1467,6 +1467,7 @@ dependencies = [
  "anyhow",
  "env_logger",
  "log",
+ "rust_decimal",
  "serde",
  "serde_json",
  "sqlx",
