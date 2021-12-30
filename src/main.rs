@@ -22,6 +22,21 @@ async fn create_user(new_user: web::Json<NewUser>, pool: web::Data<PgPool>) -> i
     }
 }
 
+#[post("/payments")]
+async fn create_payment(
+    new_payment: web::Json<NewPayment>,
+    pool: web::Data<PgPool>,
+) -> impl Responder {
+    let result = Payment::create(new_payment.into_inner(), pool.get_ref()).await;
+    match result {
+        Ok(payment) => HttpResponse::Created().json(payment),
+        Err(err) => {
+            error!("Failed to create payment: {}", err);
+            HttpResponse::BadRequest().json("Failed to create payment")
+        }
+    }
+}
+
 fn configure() -> (String, String, u16) {
     let database_url = env::var("DATABASE_URL")
         .unwrap_or_else(|_| String::from("postgres://postgres:postgres@localhost:5432/postgres"));

@@ -37,3 +37,43 @@ impl User {
         })
     }
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewPayment {
+    pub from_user: Uuid,
+    pub to_user: Uuid,
+    pub amount: f64,
+}
+
+#[derive(Serialize, FromRow, Debug)]
+pub struct Payment {
+    pub id: Uuid,
+    pub from_user: Uuid,
+    pub to_user: Uuid,
+    pub amount: f64,
+}
+
+impl Payment {
+    pub async fn create(new_payment: NewPayment, pool: &PgPool) -> Result<User> {
+        let mut transaction = pool.begin().await?;
+        let record: Payment = sqlx::query_as(
+            "
+            INSERT INTO payments (from_user, to_user, amount)
+            VALUES ($1, $2, $3)
+            RETURNING id, from_user, to_user, amount
+            ",
+        )
+        .bind(new_payment.name)
+        .fetch_one(&mut transaction)
+        .await?;
+
+        transaction.commit().await?;
+
+        Ok(Payment {
+            id: record.id,
+            from_user: record.from_user,
+            to_user: record.to_user,
+            amount: record.amount,
+        })
+    }
+}
