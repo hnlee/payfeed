@@ -9,7 +9,7 @@ use std::env;
 
 #[get("/")]
 async fn hello() -> impl Responder {
-    payfeed::run_consumer()
+    payfeed::run_consumer().await;
     HttpResponse::Ok().body("Hello world!")
 }
 
