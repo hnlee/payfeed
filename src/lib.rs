@@ -119,59 +119,22 @@ impl Transfer {
     }
 }
 
-use clap::{App, Arg};
 use log::{info, warn};
-
-use rdkafka::client::ClientContext;
 use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
 use rdkafka::consumer::stream_consumer::StreamConsumer;
-use rdkafka::consumer::{CommitMode, Consumer, ConsumerContext, Rebalance};
-use rdkafka::error::KafkaResult;
+use rdkafka::consumer::{CommitMode, Consumer};
 use rdkafka::message::{Headers, Message};
-use rdkafka::topic_partition_list::TopicPartitionList;
 use rdkafka::util::get_rdkafka_version;
 
-use crate::example_utils::setup_logger;
-
-mod example_utils;
-
-// A context can be used to change the behavior of producers and consumers by adding callbacks
-// that will be executed by librdkafka.
-// This particular context sets up custom callbacks to log rebalancing events.
-struct CustomContext;
-
-impl ClientContext for CustomContext {}
-
-impl ConsumerContext for CustomContext {
-    fn pre_rebalance(&self, rebalance: &Rebalance) {
-        info!("Pre rebalance {:?}", rebalance);
-    }
-
-    fn post_rebalance(&self, rebalance: &Rebalance) {
-        info!("Post rebalance {:?}", rebalance);
-    }
-
-    fn commit_callback(&self, result: KafkaResult<()>, _offsets: &TopicPartitionList) {
-        info!("Committing offsets: {:?}", result);
-    }
-}
-
-// A type alias with your custom consumer can be created for convenience.
-type LoggingConsumer = StreamConsumer<CustomContext>;
-
 async fn consume_and_print(brokers: &str, group_id: &str, topics: &[&str]) {
-    let context = CustomContext;
-
-    let consumer: LoggingConsumer = ClientConfig::new()
+    let consumer: StreamConsumer = ClientConfig::new()
         .set("group.id", group_id)
         .set("bootstrap.servers", brokers)
         .set("enable.partition.eof", "false")
         .set("session.timeout.ms", "6000")
         .set("enable.auto.commit", "true")
-        //.set("statistics.interval.ms", "30000")
-        //.set("auto.offset.reset", "smallest")
         .set_log_level(RDKafkaLogLevel::Debug)
-        .create_with_context(context)
+        .create()
         .expect("Consumer creation failed");
 
     consumer
@@ -205,101 +168,55 @@ async fn consume_and_print(brokers: &str, group_id: &str, topics: &[&str]) {
 }
 
 pub async fn run_consumer() {
-    let matches = App::new("consumer example")
-        .version(option_env!("CARGO_PKG_VERSION").unwrap_or(""))
-        .about("Simple command line consumer")
-        .arg(
-            Arg::with_name("brokers")
-                .short("b")
-                .long("brokers")
-                .help("Broker list in kafka format")
-                .takes_value(true)
-                .default_value("localhost:9092"),
-        )
-        .arg(
-            Arg::with_name("group-id")
-                .short("g")
-                .long("group-id")
-                .help("Consumer group id")
-                .takes_value(true)
-                .default_value("example_consumer_group_id"),
-        )
-        .arg(
-            Arg::with_name("log-conf")
-                .long("log-conf")
-                .help("Configure the logging format (example: 'rdkafka=trace')")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("topics")
-                .short("t")
-                .long("topics")
-                .help("Topic list")
-                .takes_value(true)
-                .multiple(true)
-                .required(true),
-        )
-        .get_matches();
-
-    setup_logger(true, matches.value_of("log-conf"));
+    setup_logger(true, "rdkafka:trace");
 
     let (version_n, version_s) = get_rdkafka_version();
     info!("rd_kafka_version: 0x{:08x}, {}", version_n, version_s);
 
-    let topics = matches.values_of("topics").unwrap().collect::<Vec<&str>>();
-    let brokers = matches.value_of("brokers").unwrap();
-    let group_id = matches.value_of("group-id").unwrap();
+    let topics = vec![
+        "app.public.users",
+        "app.public.transfers",
+        "app.public.payments",
+    ];
+    let brokers = "kafka:9092";
+    let group_id = "app_consumer_group";
 
     consume_and_print(brokers, group_id, &topics).await
 }
 
-// use rdkafka::consumer::stream_consumer::StreamConsumer;
-// use rdkafka::consumer::Consumer;
-// use rdkafka::Message;
-// use std::boxed::Box;
-// use tokio::runtime::current_thread::Runtime;
+use chrono::prelude::*;
+use env_logger::fmt::Formatter;
+use env_logger::Builder;
+use log::{LevelFilter, Record};
+use std::io::Write;
+use std::thread;
 
-// mod utils;
+pub fn setup_logger(log_thread: bool, rust_log: &str) {
+    let output_format = move |formatter: &mut Formatter, record: &Record| {
+        let thread_name = if log_thread {
+            format!("(t: {}) ", thread::current().name().unwrap_or("unknown"))
+        } else {
+            "".to_string()
+        };
 
-// fn echo_message<M: Message>(msg: M) -> Result<(), std::str::Utf8Error> {
-//     let deserialize = |o| match o {
-//         None => Ok(""),
-//         Some(val) => Ok(std::str::from_utf8(val)?),
-//     };
+        let local_time: DateTime<Local> = Local::now();
+        let time_str = local_time.format("%H:%M:%S%.3f").to_string();
+        write!(
+            formatter,
+            "{} {}{} - {} - {}\n",
+            time_str,
+            thread_name,
+            record.level(),
+            record.target(),
+            record.args()
+        )
+    };
 
-//     println!(
-//         "Consumed record from topic {} partition [{}] @ offset {} with key {} and value {}",
-//         msg.topic(),
-//         msg.partition(),
-//         msg.offset(),
-//         deserialize(msg.key())?,
-//         deserialize(msg.payload())?,
-//     );
+    let mut builder = Builder::new();
+    builder
+        .format(output_format)
+        .filter(None, LevelFilter::Info)
+        .parse_filters(rust_log);
 
-//     Ok(())
-// }
-
-// fn run_consumer() -> Result<(), Box<dyn std::error::Error>> {
-//     let (topic, mut config) = utils::get_config()?;
-//     let consumer: StreamConsumer = config.set("group.id", "rust_example_group_1").create()?;
-
-//     consumer.subscribe(&vec![topic.as_ref()])?;
-
-//     let processor = consumer
-//         .stream()
-//         .filter_map(|result| match result {
-//             Ok(_) => result.ok(),
-//             Err(err) => {
-//                 eprintln!("error consuming from message stream: {}", err);
-//                 None
-//             }
-//         })
-//         .for_each(|msg| echo_message(msg).map_err(|_| eprintln!("error deserializing message")));
-
-//     Runtime::new()?
-//         .block_on(processor)
-//         .map_err(|_| eprintln!("error running consumer on current thread"))
-//         .ok();
-
-//     Ok(())
-// }
+    builder.init();
+}
