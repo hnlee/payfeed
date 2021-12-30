@@ -54,7 +54,7 @@ pub struct Payment {
 }
 
 impl Payment {
-    pub async fn create(new_payment: NewPayment, pool: &PgPool) -> Result<User> {
+    pub async fn create(new_payment: NewPayment, pool: &PgPool) -> Result<Payment> {
         let mut transaction = pool.begin().await?;
         let record: Payment = sqlx::query_as(
             "
@@ -63,7 +63,9 @@ impl Payment {
             RETURNING id, from_user, to_user, amount
             ",
         )
-        .bind(new_payment.name)
+        .bind(new_payment.from_user)
+        .bind(new_payment.to_user)
+        .bind(new_payment.amount)
         .fetch_one(&mut transaction)
         .await?;
 
@@ -73,6 +75,44 @@ impl Payment {
             id: record.id,
             from_user: record.from_user,
             to_user: record.to_user,
+            amount: record.amount,
+        })
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct NewTransfer {
+    pub for_user: Uuid,
+    pub amount: f64,
+}
+
+#[derive(Serialize, FromRow, Debug)]
+pub struct Transfer {
+    pub id: Uuid,
+    pub for_user: Uuid,
+    pub amount: f64,
+}
+
+impl Transfer {
+    pub async fn create(new_transfer: NewTransfer, pool: &PgPool) -> Result<Transfer> {
+        let mut transaction = pool.begin().await?;
+        let record: Transfer = sqlx::query_as(
+            "
+            INSERT INTO transfers (for_user, amount)
+            VALUES ($1, $2)
+            RETURNING id, for_user, amount
+            ",
+        )
+        .bind(new_transfer.for_user)
+        .bind(new_transfer.amount)
+        .fetch_one(&mut transaction)
+        .await?;
+
+        transaction.commit().await?;
+
+        Ok(Transfer {
+            id: record.id,
+            for_user: record.for_user,
             amount: record.amount,
         })
     }
