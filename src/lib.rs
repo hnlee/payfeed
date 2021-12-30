@@ -120,7 +120,6 @@ impl Transfer {
 }
 
 use clap::{App, Arg};
-use futures::stream::Stream;
 use log::{info, warn};
 
 use rdkafka::client::ClientContext;

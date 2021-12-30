@@ -1,9 +1,7 @@
 use actix_web::{get, middleware, post, web, App, HttpResponse, HttpServer, Responder};
 use anyhow::Result;
 use log::error;
-use payfeed::{
-    simple_consumer::consume_and_print, NewPayment, NewTransfer, NewUser, Payment, Transfer, User,
-};
+use payfeed::{NewPayment, NewTransfer, NewUser, Payment, Transfer, User};
 use sqlx::postgres::PgPool;
 use std::env;
 
