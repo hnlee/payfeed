@@ -153,7 +153,7 @@ fn run_consumer() -> Result<(), Box<dyn std::error::Error>> {
     consumer.subscribe(&vec![topic.as_ref()])?;
 
     let processor = consumer
-        .start()
+        .stream()
         .filter_map(|result| match result {
             Ok(_) => result.ok(),
             Err(err) => {

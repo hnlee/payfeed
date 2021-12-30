@@ -34,8 +34,8 @@ pub fn get_config() -> Result<(String, ClientConfig), Box<dyn std::error::Error>
         }
         let key_value: Vec<&str> = cur_line.split("=").collect();
         kafka_config.set(
-            key_value.get(0).ok_or("malformed key")?,
-            key_value.get(1).ok_or("malformed value")?,
+            *key_value.get(0).ok_or("malformed key")?,
+            *key_value.get(1).ok_or("malformed value")?,
         );
     }
 
